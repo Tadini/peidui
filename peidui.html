@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>Examples</title>
+<meta name="description" content="">
+<meta name="keywords" content="">
+<link href="" rel="stylesheet">
+<style>
+	*{margin:0;padding:0;}
+	li{list-style:none;}
+	body{font-family: "Microsoft Yahei";}
+	.details{margin:0 auto;width:384px;}
+	.message{width:360px;height:40px;line-height: 40px;}
+	.message li{width:33.3333%;height:40px;color:#666;font-size: 16px;float: left;text-align: center;}
+	.message .color{color:red;font-size: 20px;font-family: Helvetica;}
+	.gameBox{margin:0 auto;width:384px;border:1px solid #333;height:auto;overflow:hidden;}
+	.gameBox li{width:90px;height:90px;float: left;position: relative;    transform-style: preserve-3d;  perspective: 800px;perspective-original:top;}
+	.gameBox li div,.gameBox li img{width:100%;height:100%;position: absolute;top:0;left:0;transition:transform .2s;backface-visibility: hidden;background-size: contain;transform-origin: 50% 50% ;}
+	.gameBox li div{transform:rotateY(0deg);background-image:url(img/back.png);background-repeat: no-repeat;}
+	.gameBox .imgInfo{transform:rotateY(180deg);}
+	.gameBox li.hover .imgBg{transform:rotateY(180deg);}
+	.gameBox li.hover .imgInfo{transform:rotateY(0deg);}
+	.gameBox li img{width:100%;height:100%;}
+	.btn{width:100px;height:30px;background:#fe6540;color:#fff;font-size:14px;border:none;font-family: "Microsoft Yahei";}
+	.bgColor{background: #00baa1;}
+</style>
+<script>
+	
+	var cookieHandle={
+			set: function(){
+				var opts = arguments[0];
+				var oDate = new Date();
+				if(arguments.length>1){
+					oDate.setDate(oDate.getDate()+arguments[2])
+					document.cookie = encodeURI(arguments[0])+"="+encodeURI(arguments[1])+";expires="+ oDate.toUTCString();
+				}
+				else if(arguments.length==1&&typeof arguments[0]=="object"){
+					oDate.setDate(oDate.getDate()+opts.time)
+					document.cookie = encodeURI(opts.key)+"="+encodeURI(opts.val)+";expires="+ oDate.toUTCString();
+				}
+			},
+			get: function(key){
+				var arr1 = document.cookie.split("; "),arr2;
+				for(var i=0;i<arr1.length;i++){
+					arr2 = arr1[i].split("=");
+					if(arr2[0]==key){
+						return decodeURI(arr2[1]);
+					}
+				}
+			}
+		}
+</script>
+</head>
+<body>
+	<div class="details">
+		<ul class="message">
+			<li class="info">得分：<span class="color" id="scoreRecord">0</span></li>
+			<li class="info"><button type="button" id="start" class="btn">开始</button></li>
+			<li class="info">计时： <span class="color" id="time">100</span></li>
+		</ul>
+		<ul class="message">
+			<li class="info"><input type="button" value="简单" id="simple" class="btn bgColor"></li>
+			<li class="info"><input type="button" value="中等" id="middle" class="btn"></li>
+			<li class="info"><input type="button" value="较难" id="hard" class="btn"></li>
+		</ul>
+		<div id="recordInfo">最高纪录：</div>
+	</div>
+	
+     <div class="gameBox">
+		<div id="pairBox">
+			<ul>
+			</ul>
+		</div>
+    </div>
+    <div id="music">
+    	<audio id="audio1" src="audio/flip.mp3" preload="auto" ></audio>
+    	<audio id="audio2" src="audio/bonus.mp3" preload="auto" ></audio>
+    </div>
+<script>
+(function(window){
+	Array.prototype.randomEach = function(){
+		var len = this.length,tempArr =[],index=0,elem = null;
+		while(len){
+			index = Math.floor(Math.random()*len--);
+			elem = this.splice(index,1)[0];
+			tempArr.push(elem);
+		}
+		return tempArr;
+	};
+	var $ = function(id){
+		return document.getElementById(id);
+	}
+	function css(attr,val){
+		var temp = "webkit "
+	}
+	var audio1 = $("audio1"),audio2 = $("audio2"),scoreTag = $("scoreRecord"),timeTag = $("time"),oStart = $("start");
+	var countTimer =null,all = 100;
+	var status = 0,//0->未开始 1->游戏中 -1-->游戏结束
+		difficulty = "easy";//难度说明
+	oStart.onclick = function(){
+		if(!this.on){
+			status = 1;
+			pair.timeCount();
+			this.innerHTML ="停止";
+			this.on =1;
+			pair(difficulty);
+		}else{
+			this.on =0;
+			this.innerHTML ="开始";
+			status = 0;
+			clearTimeout(countTimer);
+		}
+	}
+	$("simple").onclick = function(){
+		if(status == 1){return}
+		difficulty = "easy";
+		cg(this);
+		pair(difficulty);
+	}
+	$("middle").onclick = function(){
+		if(status == 1){return}
+		difficulty = "middle";
+		cg(this);
+		pair(difficulty);
+	}
+	$("hard").onclick = function(){
+		if(status == 1){return}
+		difficulty = "hard";
+		cg(this);
+		pair(difficulty);
+	}
+	function cg(obj){
+		var aInp = document.getElementsByTagName("input");
+		for(var i=0;i<aInp.length;i++){
+			aInp[i].className = "btn"
+		}
+		obj.className ="btn bgColor"
+	}
+	function pair(opts){
+		return new pair.fn.init(opts)
+	}
+	pair.fn = pair.prototype={
+		constructor: pair,
+		init: function(opts){
+			this.setting(opts);
+			this.setArr();
+			this.setGame();
+			this.addEvent();
+		},
+		setting: function(opts){
+			this.Wrap = $("pairBox");
+			this.oUl = this.Wrap.getElementsByTagName("ul")[0];
+			this.aLi = this.oUl.getElementsByTagName("li");
+			this.imgArr = ["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg","6.jpg"];
+			this.rangeArr =["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg","6.jpg"];
+			this.timer = null;
+			this.level = opts||"easy";//easy-4  middle-6 hard-8
+			this.score = 0;
+			this.randomArr=[];
+		},
+		setArr: function(){
+			var tempArr=[],addNum=0;
+			if(this.level == "easy"){
+				while(this.rangeArr.length>4){
+					tempArr.push(this.rangeArr.splice(this.rangeArr.length*Math.random(),1)[0]);
+				}
+				tempArr = this.imgArr.concat(tempArr)
+			}else if(this.level == "middle"){
+				tempArr = this.rangeArr.concat(this.rangeArr,this.rangeArr);
+			}else{
+				tempArr = this.rangeArr.concat(this.rangeArr,this.rangeArr,this.rangeArr,this.rangeArr);
+				while(this.rangeArr.length>4){
+					tempArr.push(this.rangeArr.splice(this.rangeArr.length*Math.random(),1)[0]);
+				}
+			}
+			this.rangeArr =tempArr;
+			//console.log(this.randomArr)
+			this.randomArr = this.rangeArr.concat(this.rangeArr);
+			this.randomArr = this.randomArr.randomEach();
+			//console.log(this.randomArr)
+		},
+		setGame: function(){
+			var  num = i = j = index =0,
+				str = '';
+			if(this.level == "easy"){
+				num = 4;
+			}else if(this.level == "middle"){
+				num = 6;
+			}else{
+				num = 8;
+			}
+			for(i=0;i<num;i++){
+				for(j=0;j<num;j++){
+					str +=' <li style="width:'+384/num+'px;height:'+384/num+'px">';
+					str +='<div style="transform:rotateY(0deg);"></div> ';
+					str +=' <img src="img/'+this.randomArr[index++]+'" ';
+					str +=' style="transform:rotateY(180deg);"></li>';
+				}
+			}
+			this.oUl.innerHTML = str;
+			for(i=0;i<this.aLi.length;i++){
+				this.aLi[i].onOff = false;
+				this.aLi[i].index = i;
+			}
+		},
+		addEvent: function(){
+			var self = this;
+			this.pairNum = 0;//页面翻转的牌数
+			this.Wrap.onclick=function(ev){
+				ev = ev || window.event;
+				var oTarget = ev.srcElement || ev.target;
+				switch (status){
+					case 0:
+					alert("游戏还未开始")
+					return;
+					break;
+					case -1:
+					alert("游戏已经结束");
+					audio1.pause();audio2.pasue();
+					return;
+					break;
+				}
+				if(oTarget.parentNode.nodeName.toLowerCase() =="li"){
+					self.clickFn(oTarget.parentNode);//触发点击事件
+				}
+			}
+		},
+		clickFn: function(obj){
+			var self =this;
+			//未被翻转的才能够点击翻转
+			if(obj.onOff){return;}
+			//每次点击触发音效
+			audio1.load();audio1.play();
+			//翻转将超过2个的时候 将所有牌面翻转过来 
+			if(self.pairNum==2){
+				self.pairNum=0;
+				//self.pairArr= [];//清空数组
+				self.initPair();
+			}
+			//翻转牌面未超过2个的时候 继续翻转
+			obj.onOff = true;
+			obj.getElementsByTagName('div')[0].style.transform ="rotateY(180deg)";
+			obj.getElementsByTagName('img')[0].style.transform ="rotateY(0deg)";
+			//self.pairArr[self.pairNum] = obj.index;
+			
+			self.pairNum++;
+			//此时翻转牌面为两个是 判断这2个是否相同
+			if(self.pairNum==2){
+				(function(old){//闭包的作用是即时传递old使其不会被覆盖;
+					setTimeout(function(){
+						self.isSame(old,obj);
+					},300);
+				})(self.old);
+			}
+			this.old = obj;
+		},
+		isSame: function(old,obj){
+			var self = this,elem = null;
+			
+			if(this.randomArr[old.index]===this.randomArr[obj.index]&&status==1){//判断相等
+				elem = this.aLi[obj.index].getElementsByTagName("img")[0];
+					audio2.load();
+					audio2.play();
+					self.aLi[old.index].style.visibility = self.aLi[obj.index].style.visibility ="hidden";
+					this.score++;
+					scoreTag.innerHTML = this.score;
+					if(this.score==this.randomArr.length/2){
+						setTimeout(function(){
+							alert("恭喜你，全部匹配成功！")
+							clearTimeout(countTimer);
+							if(!cookieHandle.get(difficulty)||JSON.parse(cookieHandle.get(difficulty)).time>(100-all)){
+								cookieHandle.set({key:difficulty,val:JSON.stringify({difficulty:pair.difficulty(difficulty),score:self.score,time:(100-all)}),time:3})
+								$("recordInfo").innerHTML="最高纪录："+pair.difficulty(difficulty)+"级别,"+"得"+self.score+"分,用时"+(100-all)+"s";
+							}
+								oStart.on =0;
+								oStart.innerHTML ="开始";
+								status = -1;
+						},300)
+					}
+				return true;
+			}
+			return false
+		},
+		initPair: function(){//初始化牌面
+			var self = this;
+			for(var i=0;i<self.aLi.length;i++){
+					self.aLi[i].getElementsByTagName('div')[0].style.transform ="rotateY(0deg)";
+					self.aLi[i].getElementsByTagName('img')[0].style.transform ="rotateY(180deg)";
+					self.aLi[i].onOff = false;
+			}
+		}
+	}
+	pair.timeCount= function(){
+		var self =this;
+		all = 100;
+		clearTimeout(countTimer)
+		fn();
+		function fn(){
+			timeTag.innerHTML = all;
+			all--;
+			countTimer =setTimeout(fn,1000);
+			if(all<0){
+				clearTimeout(countTimer);
+				alert("时间到");
+				status = -1;
+			};
+		}
+	}
+	pair.difficulty = function(difficulty){
+		switch(difficulty){
+			case "easy":
+				return "简单";
+			break;
+			case "middle":
+				return "中等";
+			break;
+			case "hard":
+				return "较难";
+			break;
+		}
+	}
+	pair.fn.init.prototype = pair.fn;
+	window.pair = pair;
+		if(cookieHandle.get(difficulty)){
+			var json1 = JSON.parse(cookieHandle.get(difficulty));
+			$("recordInfo").innerHTML="最高纪录："+json1.difficulty+"级别,"+"得"+json1.score+"分,用时"+json1.time+"s";
+		}
+})(window)
+
+pair()
+
+</script>
+</body>
+</html>
